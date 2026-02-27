@@ -1,0 +1,1265 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulador de Extrusão Blow Film - Engenharia Avançada</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Fira+Code:wght@300;400;600&display=swap');
+
+  /* ==========================================================================
+     RESET E VARIÁVEIS GLOBAIS
+     ========================================================================== */
+  :root {
+    --bg-dark: #02060a;
+    --panel-bg: rgba(6, 12, 20, 0.85);
+    --panel-border: rgba(0, 180, 255, 0.2);
+    --text-main: #c8e6f0;
+    --text-muted: rgba(200, 230, 240, 0.5);
+    --accent-blue: #00b4ff;
+    --accent-green: #00ff88;
+    --accent-yellow: #ffcc00;
+    --accent-red: #ff4466;
+    --font-ui: 'Rajdhani', sans-serif;
+    --font-mono: 'Fira Code', monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: radial-gradient(circle at 50% 50%, #0a1520 0%, var(--bg-dark) 100%);
+    color: var(--text-main);
+    font-family: var(--font-ui);
+    overflow: hidden;
+    height: 100vh;
+    user-select: none;
+  }
+
+  /* ==========================================================================
+     CONTAINERS PRINCIPAIS
+     ========================================================================== */
+  #canvas-container {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 1;
+  }
+
+  /* Painel Esquerdo - Controles */
+  #ui-left {
+    position: absolute;
+    top: 0; left: 0;
+    width: 380px;
+    height: 100vh;
+    background: linear-gradient(90deg, rgba(2,6,10,0.95) 0%, rgba(6,12,20,0.8) 100%);
+    border-right: 1px solid var(--panel-border);
+    overflow-y: auto;
+    padding: 20px;
+    backdrop-filter: blur(10px);
+    z-index: 10;
+    box-shadow: 10px 0 30px rgba(0,0,0,0.5);
+  }
+
+  /* Painel Direito - Telemetria e Gráficos */
+  #ui-right {
+    position: absolute;
+    top: 0; right: 0;
+    width: 340px;
+    height: 100vh;
+    background: linear-gradient(-90deg, rgba(2,6,10,0.95) 0%, rgba(6,12,20,0.8) 100%);
+    border-left: 1px solid var(--panel-border);
+    overflow-y: auto;
+    padding: 20px;
+    backdrop-filter: blur(10px);
+    z-index: 10;
+    box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Scrollbar Customizada */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(0,180,255,0.3); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(0,180,255,0.6); }
+
+  /* ==========================================================================
+     CABEÇALHOS E TIPOGRAFIA
+     ========================================================================== */
+  .header {
+    text-align: center;
+    padding-bottom: 15px;
+    border-bottom: 1px solid var(--panel-border);
+    margin-bottom: 20px;
+  }
+
+  .header h1 {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent-blue);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    text-shadow: 0 0 15px rgba(0,180,255,0.4);
+  }
+
+  .header p {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 5px;
+    font-family: var(--font-mono);
+    letter-spacing: 1px;
+  }
+
+  .section-title {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent-blue);
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .section-title::before {
+    content: '';
+    width: 8px; height: 8px;
+    background: var(--accent-blue);
+    border-radius: 1px;
+    box-shadow: 0 0 8px var(--accent-blue);
+  }
+
+  /* ==========================================================================
+     CONTROLES (SLIDERS E INPUTS)
+     ========================================================================== */
+  .control-group {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    transition: background 0.3s;
+  }
+
+  .control-group:hover {
+    background: rgba(255,255,255,0.04);
+  }
+
+  .param-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .param-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #e0f0f5;
+  }
+
+  .param-value {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--accent-blue);
+    background: rgba(0,180,255,0.1);
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid rgba(0,180,255,0.2);
+    min-width: 70px;
+    text-align: right;
+  }
+
+  input[type="range"] {
+    width: 100%;
+    -webkit-appearance: none;
+    height: 4px;
+    background: rgba(0,180,255,0.2);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+    margin-bottom: 5px;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--accent-blue);
+    box-shadow: 0 0 10px rgba(0,180,255,0.8);
+    cursor: pointer;
+    transition: transform 0.1s;
+  }
+
+  input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+  }
+
+  .param-hint {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    line-height: 1.4;
+  }
+
+  /* ==========================================================================
+     BARRA DE DOSAGEM (BLEND)
+     ========================================================================== */
+  .dosing-bar {
+    width: 100%;
+    height: 12px;
+    background: #000;
+    border-radius: 6px;
+    margin-top: 12px;
+    display: flex;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+
+  .dose-segment {
+    height: 100%;
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8px;
+    font-weight: bold;
+    color: #000;
+  }
+
+  .bg-ldpe { background: var(--accent-green); box-shadow: 0 0 10px var(--accent-green); }
+  .bg-hdpe { background: var(--accent-blue); box-shadow: 0 0 10px var(--accent-blue); }
+  .bg-lldpe { background: var(--accent-yellow); box-shadow: 0 0 10px var(--accent-yellow); }
+
+  /* ==========================================================================
+     TELEMETRIA E INDICADORES (PAINEL DIREITO)
+     ========================================================================== */
+  .status-banner {
+    background: rgba(0,255,136,0.1);
+    border: 1px solid var(--accent-green);
+    border-radius: 6px;
+    padding: 12px;
+    text-align: center;
+    margin-bottom: 20px;
+    transition: all 0.3s;
+  }
+
+  .status-banner.warning {
+    background: rgba(255,204,0,0.1);
+    border-color: var(--accent-yellow);
+  }
+
+  .status-banner.critical {
+    background: rgba(255,68,102,0.1);
+    border-color: var(--accent-red);
+    animation: pulse-red 1.5s infinite;
+  }
+
+  @keyframes pulse-red {
+    0% { box-shadow: 0 0 0 0 rgba(255,68,102,0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(255,68,102,0); }
+    100% { box-shadow: 0 0 0 0 rgba(255,68,102,0); }
+  }
+
+  .status-title {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+
+  .status-msg {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--accent-green);
+    letter-spacing: 1px;
+  }
+
+  .grid-2col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .stat-card {
+    background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 6px;
+    padding: 12px;
+    text-align: center;
+  }
+
+  .stat-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    margin-bottom: 5px;
+  }
+
+  .stat-value {
+    font-size: 20px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+  }
+
+  .c-blue { color: var(--accent-blue); }
+  .c-green { color: var(--accent-green); }
+  .c-yellow { color: var(--accent-yellow); }
+
+  /* ==========================================================================
+     GRÁFICO DE PERFIL (CANVAS 2D)
+     ========================================================================== */
+  .graph-container {
+    flex-grow: 1;
+    background: rgba(0,0,0,0.5);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    min-height: 250px;
+  }
+
+  .graph-header {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-align: center;
+    margin-bottom: 10px;
+    font-family: var(--font-mono);
+  }
+
+  #profile-chart {
+    width: 100%;
+    height: 100%;
+    flex-grow: 1;
+  }
+
+  /* ==========================================================================
+     OVERLAYS E ALERTAS
+     ========================================================================== */
+  #camera-hints {
+    position: absolute;
+    bottom: 20px;
+    left: 400px;
+    background: rgba(0,0,0,0.6);
+    border: 1px solid rgba(255,255,255,0.1);
+    padding: 10px 15px;
+    border-radius: 6px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  .hint-key { color: var(--accent-blue); font-weight: bold; }
+
+  #critical-alert {
+    position: fixed;
+    top: 30px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-100px);
+    background: rgba(255,20,60,0.95);
+    border: 2px solid #ff4466;
+    border-radius: 8px;
+    padding: 15px 30px;
+    font-size: 16px;
+    font-weight: 700;
+    color: white;
+    letter-spacing: 2px;
+    z-index: 100;
+    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    box-shadow: 0 10px 40px rgba(255,20,60,0.6);
+    text-align: center;
+  }
+
+  #critical-alert.show {
+    transform: translateX(-50%) translateY(0);
+  }
+</style>
+</head>
+<body>
+
+<!-- Alerta Crítico -->
+<div id="critical-alert">⚠ RUPTURA DE BALÃO DETECTADA ⚠</div>
+
+<!-- Dicas de Câmera -->
+<div id="camera-hints">
+  <span class="hint-key">DRAG</span> Rotacionar | 
+  <span class="hint-key">SCROLL</span> Zoom
+</div>
+
+<!-- Container 3D -->
+<div id="canvas-container"></div>
+
+<!-- ==========================================================================
+     PAINEL ESQUERDO: CONTROLES DE ENGENHARIA
+     ========================================================================== -->
+<div id="ui-left">
+  <div class="header">
+    <h1>Blow Film Sim</h1>
+    <p>SIMULADOR REOLÓGICO V3.0</p>
+  </div>
+
+  <!-- DOSAGEM DE MATERIAIS -->
+  <div class="section-title">1. Blend de Polímeros</div>
+  <div class="control-group">
+    <div class="param-row">
+      <span class="param-label">LDPE (Baixa Densidade)</span>
+      <span class="param-value" id="val-ldpe">50%</span>
+    </div>
+    <input type="range" id="in-ldpe" min="0" max="100" value="50" oninput="updateDosing()">
+    <div class="param-hint">Alta resistência do fundido. Gera formato "Pocket" (expansão rápida).</div>
+
+    <div class="param-row" style="margin-top: 12px;">
+      <span class="param-label">HDPE (Alta Densidade)</span>
+      <span class="param-value" id="val-hdpe">20%</span>
+    </div>
+    <input type="range" id="in-hdpe" min="0" max="100" value="20" oninput="updateDosing()">
+    <div class="param-hint">Baixa resistência à tração fundida. Gera formato "Long Stalk" (pescoço).</div>
+
+    <div class="param-row" style="margin-top: 12px;">
+      <span class="param-label">LLDPE (Linear)</span>
+      <span class="param-value" id="val-lldpe">30%</span>
+    </div>
+    <input type="range" id="in-lldpe" min="0" max="100" value="30" oninput="updateDosing()">
+    <div class="param-hint">Melhora propriedades mecânicas, mas aumenta risco de fratura de fundido.</div>
+
+    <div class="dosing-bar">
+      <div id="bar-ldpe" class="dose-segment bg-ldpe" style="width: 50%;">LDPE</div>
+      <div id="bar-hdpe" class="dose-segment bg-hdpe" style="width: 20%;">HDPE</div>
+      <div id="bar-lldpe" class="dose-segment bg-lldpe" style="width: 30%;">LLDPE</div>
+    </div>
+
+    <div class="param-row" style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
+      <span class="param-label">Auxiliar de Fluxo (PPA)</span>
+      <span class="param-value" id="val-ppa">0.5%</span>
+    </div>
+    <input type="range" id="in-ppa" min="0" max="5" value="0.5" step="0.1" oninput="updateSim()">
+    <div class="param-hint">Lubrifica a matriz, reduzindo instabilidade e fratura (Sharkskin).</div>
+  </div>
+
+  <!-- PARÂMETROS DA MATRIZ -->
+  <div class="section-title">2. Geometria da Matriz</div>
+  <div class="control-group">
+    <div class="param-row">
+      <span class="param-label">Diâmetro da Die (mm)</span>
+      <span class="param-value" id="val-dieD">150</span>
+    </div>
+    <input type="range" id="in-dieD" min="50" max="300" value="150" step="5" oninput="updateSim()">
+    
+    <div class="param-row" style="margin-top: 12px;">
+      <span class="param-label">Gap da Die (mm)</span>
+      <span class="param-value" id="val-dieGap">1.5</span>
+    </div>
+    <input type="range" id="in-dieGap" min="0.5" max="3.0" value="1.5" step="0.1" oninput="updateSim()">
+  </div>
+
+  <!-- TERMODINÂMICA E INSUFLAMENTO -->
+  <div class="section-title">3. Termodinâmica e Ar</div>
+  <div class="control-group">
+    <div class="param-row">
+      <span class="param-label">Temp. do Fundido (°C)</span>
+      <span class="param-value" id="val-temp">190</span>
+    </div>
+    <input type="range" id="in-temp" min="150" max="240" value="190" step="2" oninput="updateSim()">
+    <div class="param-hint">Baixar a temp. faz o balão "sentar" (FLH desce). Muito baixa gera fratura.</div>
+
+    <div class="param-row" style="margin-top: 12px;">
+      <span class="param-label">Pressão Interna (mbar)</span>
+      <span class="param-value" id="val-press">45</span>
+    </div>
+    <input type="range" id="in-press" min="10" max="120" value="45" step="1" oninput="updateSim()">
+    <div class="param-hint">Controla a expansão transversal (BUR).</div>
+
+    <div class="param-row" style="margin-top: 12px;">
+      <span class="param-label">Ar de Resfriamento (m³/h)</span>
+      <span class="param-value" id="val-cool">1200</span>
+    </div>
+    <input type="range" id="in-cool" min="300" max="2500" value="1200" step="50" oninput="updateSim()">
+    <div class="param-hint">Congela o polímero. Define a altura da Linha de Névoa (FLH).</div>
+  </div>
+
+  <!-- CINEMÁTICA -->
+  <div class="section-title">4. Cinemática da Linha</div>
+  <div class="control-group">
+    <div class="param-row">
+      <span class="param-label">Veloc. Puxamento (m/min)</span>
+      <span class="param-value" id="val-speed">25</span>
+    </div>
+    <input type="range" id="in-speed" min="5" max="100" value="25" step="1" oninput="updateSim()">
+    <div class="param-hint">Estiramento longitudinal (DDR). Muito rápido rompe o balão.</div>
+
+    <div class="param-row" style="margin-top: 12px;">
+      <span class="param-label">Produção (kg/h)</span>
+      <span class="param-value" id="val-throughput">120</span>
+    </div>
+    <input type="range" id="in-throughput" min="20" max="400" value="120" step="5" oninput="updateSim()">
+  </div>
+</div>
+
+<!-- ==========================================================================
+     PAINEL DIREITO: TELEMETRIA E GRÁFICOS
+     ========================================================================== -->
+<div id="ui-right">
+  <div class="section-title">Telemetria em Tempo Real</div>
+
+  <div class="status-banner" id="status-box">
+    <div class="status-title">Status do Processo</div>
+    <div class="status-msg" id="status-text">OPERAÇÃO ESTÁVEL</div>
+  </div>
+
+  <div class="grid-2col">
+    <div class="stat-card">
+      <div class="stat-label">BUR (Blow Up Ratio)</div>
+      <div class="stat-value c-blue" id="out-bur">2.50</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">DDR (Draw Down)</div>
+      <div class="stat-value c-blue" id="out-ddr">15.2</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Espessura Filme</div>
+      <div class="stat-value c-green" id="out-thick">45 µm</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Estabilidade</div>
+      <div class="stat-value c-green" id="out-stab">98%</div>
+    </div>
+  </div>
+
+  <div class="stat-card" style="margin-bottom: 20px;">
+    <div class="stat-label">Altura Linha de Névoa (FLH)</div>
+    <div class="stat-value c-yellow" id="out-flh">650 mm</div>
+  </div>
+
+  <!-- Gráfico 2D -->
+  <div class="graph-container">
+    <div class="graph-header">PERFIL DO BALÃO (Raio vs Altura)</div>
+    <canvas id="profile-chart"></canvas>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     MOTOR DE SIMULAÇÃO (THREE.JS + FÍSICA)
+     ========================================================================== -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/**
+ * BLOW FILM EXTRUSION SIMULATOR - ENGENHARIA AVANÇADA
+ * Autor: Assistente IA
+ * Descrição: Simulação física e visual completa do processo de extrusão de filme tubular.
+ */
+
+// ----------------------------------------------------------------------------
+// 1. VARIÁVEIS GLOBAIS E ESTADO DA SIMULAÇÃO
+// ----------------------------------------------------------------------------
+let scene, camera, renderer, clock;
+let extruderGroup, dieGroup, balloonMesh, nipRollsGroup;
+let frostLineRing, particleSystem;
+
+// Estado Físico e Inputs
+const state = {
+  // Inputs
+  ldpe: 50, hdpe: 20, lldpe: 30, ppa: 0.5,
+  dieD: 150, dieGap: 1.5,
+  temp: 190, press: 45, cool: 1200,
+  speed: 25, throughput: 120,
+  
+  // Outputs Calculados
+  bur: 0, ddr: 0, thickness: 0, flh: 0,
+  stalkHeight: 0, stability: 100,
+  
+  // Geometria 3D
+  dieRadius3D: 0, maxRadius3D: 0,
+  nipHeight: 22.0, // Altura onde o balão fecha
+  wobbleAmp: 0
+};
+
+// Arrays para o Gráfico 2D
+let graphData = { heights: [], radii:[] };
+
+// Materiais 3D
+const matMetalDark = new THREE.MeshStandardMaterial({ color: 0x222b33, roughness: 0.5, metalness: 0.8 });
+const matMetalLight = new THREE.MeshStandardMaterial({ color: 0x667788, roughness: 0.3, metalness: 0.9 });
+const matHeater = new THREE.MeshStandardMaterial({ color: 0xaa3311, emissive: 0x551100, roughness: 0.7 });
+const matAirRing = new THREE.MeshStandardMaterial({ color: 0x111820, roughness: 0.6, metalness: 0.4 });
+
+// Material do Filme (Usa Vertex Colors para transição Quente -> Frio)
+const matFilm = new THREE.MeshPhysicalMaterial({
+  vertexColors: true,
+  transparent: true,
+  opacity: 0.6,
+  roughness: 0.15,
+  metalness: 0.05,
+  transmission: 0.8,
+  ior: 1.5,
+  side: THREE.DoubleSide,
+  clearcoat: 0.5
+});
+
+// ----------------------------------------------------------------------------
+// 2. INICIALIZAÇÃO DO THREE.JS
+// ----------------------------------------------------------------------------
+function init3D() {
+  const container = document.getElementById('canvas-container');
+  const W = container.clientWidth;
+  const H = container.clientHeight;
+
+  scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x02060a, 0.015);
+
+  camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 1000);
+  
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+  renderer.setSize(W, H);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.1;
+  container.appendChild(renderer.domElement);
+
+  clock = new THREE.Clock();
+
+  setupLighting();
+  buildEnvironment();
+  buildExtruderMachine();
+  buildNipRolls();
+  buildParticleSystem();
+  
+  setupCustomCamera(container);
+
+  // Força a primeira atualização física
+  updateDosing();
+
+  animate();
+}
+
+function setupLighting() {
+  const ambient = new THREE.AmbientLight(0x1a2530, 1.5);
+  scene.add(ambient);
+
+  const dirLight = new THREE.DirectionalLight(0x88ccff, 2.0);
+  dirLight.position.set(15, 25, 10);
+  dirLight.castShadow = true;
+  dirLight.shadow.mapSize.width = 2048;
+  dirLight.shadow.mapSize.height = 2048;
+  scene.add(dirLight);
+
+  const fillLight = new THREE.PointLight(0x0088ff, 1.0, 40);
+  fillLight.position.set(-15, 10, -15);
+  scene.add(fillLight);
+
+  // Luz interna da matriz (Glow do polímero fundido)
+  const dieGlow = new THREE.PointLight(0xff5500, 4.0, 12);
+  dieGlow.position.set(0, 2.5, 0);
+  scene.add(dieGlow);
+}
+
+function buildEnvironment() {
+  const grid = new THREE.GridHelper(80, 80, 0x00b4ff, 0x05101a);
+  grid.position.y = 0;
+  grid.material.opacity = 0.2;
+  grid.material.transparent = true;
+  scene.add(grid);
+
+  const floorGeo = new THREE.PlaneGeometry(80, 80);
+  const floorMat = new THREE.MeshStandardMaterial({ color: 0x02060a, roughness: 0.2, metalness: 0.5 });
+  const floor = new THREE.Mesh(floorGeo, floorMat);
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = -0.05;
+  floor.receiveShadow = true;
+  scene.add(floor);
+}
+
+// ----------------------------------------------------------------------------
+// 3. CONSTRUÇÃO DA MÁQUINA (EXTRUSORA E MATRIZ)
+// ----------------------------------------------------------------------------
+function buildExtruderMachine() {
+  extruderGroup = new THREE.Group();
+
+  // Motor e Redutor
+  const motor = new THREE.Mesh(new THREE.BoxGeometry(1.8, 2.0, 2.2), matMetalDark);
+  motor.position.set(-6.5, 1.0, 0);
+  motor.castShadow = true;
+  extruderGroup.add(motor);
+
+  // Canhão (Barrel)
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 5.0, 32), matMetalLight);
+  barrel.rotation.z = Math.PI / 2;
+  barrel.position.set(-3.0, 1.4, 0);
+  barrel.castShadow = true;
+  extruderGroup.add(barrel);
+
+  // Resistências (Heaters)
+  for(let i=0; i<6; i++) {
+    const heater = new THREE.Mesh(new THREE.CylinderGeometry(0.73, 0.73, 0.4, 32), matHeater);
+    heater.rotation.z = Math.PI / 2;
+    heater.position.set(-4.8 + (i * 0.8), 1.4, 0);
+    extruderGroup.add(heater);
+  }
+
+  // Funil (Hopper)
+  const hopper = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 0.3, 1.8, 16), matMetalLight);
+  hopper.position.set(-5.0, 3.0, 0);
+  extruderGroup.add(hopper);
+
+  // Adaptador Curvo
+  const adapter = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 1.8, 32), matMetalLight);
+  adapter.position.set(-0.2, 1.4, 0);
+  adapter.rotation.z = Math.PI / 4;
+  extruderGroup.add(adapter);
+
+  // MATRIZ (Die Head)
+  dieGroup = new THREE.Group();
+  dieGroup.position.set(0.8, 2.2, 0); // Centro da extrusão em X=0.8, Y=2.2
+
+  // Base da Matriz
+  const dieBase = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 0.4, 64), matMetalDark);
+  dieGroup.add(dieBase);
+
+  // Corpo Cônico
+  const dieBody = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.4, 1.2, 64), matMetalLight);
+  dieBody.position.y = 0.8;
+  dieGroup.add(dieBody);
+
+  // Anel de Ar (Air Ring) - Dual Lip
+  const airRingBase = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 1.8, 0.5, 64), matAirRing);
+  airRingBase.position.y = 1.5;
+  dieGroup.add(airRingBase);
+
+  const airRingTop = new THREE.Mesh(new THREE.TorusGeometry(1.2, 0.35, 32, 64), matAirRing);
+  airRingTop.rotation.x = Math.PI / 2;
+  airRingTop.position.y = 1.85;
+  dieGroup.add(airRingTop);
+
+  // Lábio da Matriz (Saída do Polímero)
+  const dieLip = new THREE.Mesh(new THREE.TorusGeometry(0.7, 0.05, 16, 64), matMetalDark);
+  dieLip.rotation.x = Math.PI / 2;
+  dieLip.position.y = 1.45;
+  dieGroup.add(dieLip);
+
+  extruderGroup.add(dieGroup);
+  scene.add(extruderGroup);
+
+  // O balão nascerá em Y = 2.2 (base da matriz) + 1.45 (lábio) = 3.65
+  // Para simplificar, vamos colocar o balão em X=0.8, Z=0 e Y=3.65
+}
+
+function buildNipRolls() {
+  nipRollsGroup = new THREE.Group();
+  // Posiciona no topo do balão
+  nipRollsGroup.position.set(0.8, 3.65 + state.nipHeight, 0);
+
+  const rollGeo = new THREE.CylinderGeometry(0.4, 0.4, 6.0, 32);
+  
+  const roll1 = new THREE.Mesh(rollGeo, matMetalLight);
+  roll1.rotation.z = Math.PI / 2;
+  roll1.position.set(0, 0, 0.42);
+  
+  const roll2 = new THREE.Mesh(rollGeo, matMetalLight);
+  roll2.rotation.z = Math.PI / 2;
+  roll2.position.set(0, 0, -0.42);
+
+  nipRollsGroup.add(roll1);
+  nipRollsGroup.add(roll2);
+  scene.add(nipRollsGroup);
+}
+
+// ----------------------------------------------------------------------------
+// 4. SISTEMA DE PARTÍCULAS (AR DE RESFRIAMENTO)
+// ----------------------------------------------------------------------------
+const PARTICLE_COUNT = 400;
+const pData =[];
+
+function buildParticleSystem() {
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(PARTICLE_COUNT * 3);
+  
+  for(let i=0; i<PARTICLE_COUNT; i++) {
+    pData.push({
+      angle: Math.random() * Math.PI * 2,
+      radiusOffset: Math.random() * 0.6,
+      height: Math.random() * 8,
+      speed: 0.05 + Math.random() * 0.08,
+      life: Math.random()
+    });
+  }
+  
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  
+  const mat = new THREE.PointsMaterial({
+    color: 0x88ddff, size: 0.12, transparent: true, opacity: 0.4,
+    blending: THREE.AdditiveBlending, depthWrite: false
+  });
+  
+  particleSystem = new THREE.Points(geo, mat);
+  particleSystem.position.set(0.8, 3.65 + 0.5, 0); // Acima do anel de ar
+  scene.add(particleSystem);
+}
+
+function updateParticles() {
+  if(!particleSystem) return;
+  const pos = particleSystem.geometry.attributes.position.array;
+  const airForce = state.cool / 1000;
+  
+  for(let i=0; i<PARTICLE_COUNT; i++) {
+    let p = pData[i];
+    p.height += p.speed * airForce;
+    p.angle += 0.02;
+    
+    if(p.height > state.flh + 3) {
+      p.height = 0;
+      p.angle = Math.random() * Math.PI * 2;
+    }
+    
+    // Segue o perfil do balão
+    let r = state.dieRadius3D + p.radiusOffset;
+    if(p.height > state.stalkHeight) {
+      r += (p.height - state.stalkHeight) * 0.6;
+    }
+    r = Math.min(r, state.maxRadius3D + 0.5);
+    
+    pos[i*3] = Math.cos(p.angle) * r;
+    pos[i*3+1] = p.height;
+    pos[i*3+2] = Math.sin(p.angle) * r;
+  }
+  particleSystem.geometry.attributes.position.needsUpdate = true;
+}
+
+// ----------------------------------------------------------------------------
+// 5. LÓGICA FÍSICA E REOLÓGICA
+// ----------------------------------------------------------------------------
+function updateDosing() {
+  let l = parseFloat(document.getElementById('in-ldpe').value);
+  let h = parseFloat(document.getElementById('in-hdpe').value);
+  let li = parseFloat(document.getElementById('in-lldpe').value);
+
+  let total = l + h + li;
+  if(total === 0) { l = 100; total = 100; }
+
+  state.ldpe = (l / total) * 100;
+  state.hdpe = (h / total) * 100;
+  state.lldpe = (li / total) * 100;
+
+  document.getElementById('val-ldpe').textContent = Math.round(state.ldpe) + "%";
+  document.getElementById('val-hdpe').textContent = Math.round(state.hdpe) + "%";
+  document.getElementById('val-lldpe').textContent = Math.round(state.lldpe) + "%";
+
+  document.getElementById('bar-ldpe').style.width = state.ldpe + "%";
+  document.getElementById('bar-hdpe').style.width = state.hdpe + "%";
+  document.getElementById('bar-lldpe').style.width = state.lldpe + "%";
+
+  updateSim();
+}
+
+function updateSim() {
+  // Captura Inputs
+  state.dieD = parseFloat(document.getElementById('in-dieD').value);
+  state.dieGap = parseFloat(document.getElementById('in-dieGap').value);
+  state.temp = parseFloat(document.getElementById('in-temp').value);
+  state.press = parseFloat(document.getElementById('in-press').value);
+  state.cool = parseFloat(document.getElementById('in-cool').value);
+  state.speed = parseFloat(document.getElementById('in-speed').value);
+  state.throughput = parseFloat(document.getElementById('in-throughput').value);
+  state.ppa = parseFloat(document.getElementById('in-ppa').value);
+
+  // Atualiza Textos UI
+  document.getElementById('val-dieD').textContent = state.dieD;
+  document.getElementById('val-dieGap').textContent = state.dieGap.toFixed(1);
+  document.getElementById('val-temp').textContent = state.temp;
+  document.getElementById('val-press').textContent = state.press;
+  document.getElementById('val-cool').textContent = state.cool;
+  document.getElementById('val-speed').textContent = state.speed;
+  document.getElementById('val-throughput').textContent = state.throughput;
+  document.getElementById('val-ppa').textContent = state.ppa.toFixed(1) + "%";
+
+  // --- CÁLCULOS FÍSICOS ---
+  
+  // 1. Densidade e Força do Fundido (Melt Strength)
+  const density = (state.ldpe * 0.92 + state.lldpe * 0.92 + state.hdpe * 0.96) / 100;
+  const meltStrength = (state.ldpe * 1.5 + state.lldpe * 0.8 + state.hdpe * 0.4) / 100;
+
+  // 2. BUR (Blow Up Ratio)
+  // Pressão expande, rigidez (HDPE) e baixa temperatura resistem.
+  let stiffness = 1.0 + (state.hdpe / 100) * 0.8 + ((200 - state.temp) / 100);
+  stiffness = Math.max(0.5, stiffness);
+  state.bur = 1.0 + (state.press / (30 * stiffness));
+  state.bur = Math.max(1.0, Math.min(state.bur, 4.5));
+
+  // 3. DDR (Draw Down Ratio) e Espessura
+  const dieArea = Math.PI * (state.dieD * 0.001) * (state.dieGap * 0.001);
+  const vExtrusion = (state.throughput / 3600) / (density * 1000 * dieArea);
+  const vTakeup = state.speed / 60;
+  state.ddr = vTakeup / vExtrusion;
+  state.thickness = (state.dieGap * 1000) / (state.bur * state.ddr);
+
+  // 4. FLH (Frost Line Height) - "Sentar o balão"
+  // Mais resfriamento = FLH desce. Menos temperatura = FLH desce.
+  // HDPE exige FLH mais alta naturalmente.
+  let baseFLH = 3.0 * (state.throughput / 100);
+  let tempFactor = Math.max(0.5, (state.temp - 140) / 50); // Se temp cai, FLH cai muito
+  let coolFactor = Math.max(0.5, state.cool / 1000);
+  let materialFactor = 1.0 + (state.hdpe / 100) * 1.2;
+  
+  state.flh = (baseFLH * tempFactor * materialFactor) / coolFactor;
+  state.flh = Math.max(1.0, Math.min(state.flh, 12.0));
+
+  // 5. Stalk Height (Pescoço do HDPE)
+  // Só existe se houver HDPE significativo.
+  const hdpeRatio = state.hdpe / 100;
+  state.stalkHeight = state.flh * 0.75 * Math.pow(hdpeRatio, 1.2);
+
+  // 6. Estabilidade e Fratura de Fundido
+  let stabScore = 100;
+  
+  // Excesso de velocidade ou BUR
+  if(state.bur > 3.5) stabScore -= (state.bur - 3.5) * 25;
+  if(state.ddr > 30) stabScore -= (state.ddr - 30) * 2;
+  
+  // Temperatura muito baixa causa fratura (Sharkskin), PPA ajuda a evitar
+  if(state.temp < 170) {
+    let fractureRisk = (170 - state.temp) * 2;
+    fractureRisk -= state.ppa * 10; // PPA salva
+    if(fractureRisk > 0) stabScore -= fractureRisk;
+  }
+
+  // LDPE estabiliza a bolha
+  stabScore += (state.ldpe / 100) * 15;
+  
+  state.stability = Math.max(0, Math.min(100, stabScore));
+  state.wobbleAmp = state.stability < 60 ? (60 - state.stability) * 0.01 : 0;
+
+  // --- ATUALIZA UI ---
+  document.getElementById('out-bur').textContent = state.bur.toFixed(2);
+  document.getElementById('out-ddr').textContent = state.ddr.toFixed(1);
+  document.getElementById('out-thick').textContent = Math.round(state.thickness) + " µm";
+  document.getElementById('out-flh').textContent = Math.round(state.flh * 100) + " mm";
+  document.getElementById('out-stab').textContent = Math.round(state.stability) + "%";
+
+  updateAlerts();
+  buildBalloonGeometry();
+  drawGraph();
+}
+
+function updateAlerts() {
+  const banner = document.getElementById('status-box');
+  const text = document.getElementById('status-text');
+  const critAlert = document.getElementById('critical-alert');
+
+  banner.className = 'status-banner';
+  critAlert.classList.remove('show');
+
+  if(state.stability > 75) {
+    text.textContent = "OPERAÇÃO ESTÁVEL";
+    text.style.color = "var(--accent-green)";
+  } else if(state.stability > 30) {
+    banner.classList.add('warning');
+    text.textContent = "ATENÇÃO: OSCILAÇÃO / FRATURA";
+    text.style.color = "var(--accent-yellow)";
+  } else {
+    banner.classList.add('critical');
+    text.textContent = "FALHA CRÍTICA";
+    text.style.color = "var(--accent-red)";
+    critAlert.classList.add('show');
+  }
+}
+
+// ----------------------------------------------------------------------------
+// 6. GEOMETRIA DO BALÃO (ACHATAMENTO E PERFIL)
+// ----------------------------------------------------------------------------
+function buildBalloonGeometry() {
+  if(!balloonMesh) {
+    // Cria a malha base uma única vez
+    const geo = new THREE.CylinderGeometry(1, 1, state.nipHeight, 64, 120, true);
+    // Move a origem para a base do cilindro
+    geo.translate(0, state.nipHeight / 2, 0);
+    
+    balloonMesh = new THREE.Mesh(geo, matFilm);
+    balloonMesh.position.set(0.8, 3.65, 0); // Acima da matriz
+    scene.add(balloonMesh);
+
+    // Anel da Linha de Névoa
+    const ringGeo = new THREE.TorusGeometry(1, 0.04, 16, 64);
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending });
+    frostLineRing = new THREE.Mesh(ringGeo, ringMat);
+    frostLineRing.rotation.x = Math.PI / 2;
+    scene.add(frostLineRing);
+  }
+
+  state.dieRadius3D = (state.dieD / 2) / 100;
+  state.maxRadius3D = state.dieRadius3D * state.bur;
+
+  const pos = balloonMesh.geometry.attributes.position;
+  const colors =[];
+  
+  // Limpa dados do gráfico
+  graphData.heights = [];
+  graphData.radii =[];
+
+  // Altura onde começa o achatamento (Nip Rolls)
+  const flattenStart = state.nipHeight - 4.0;
+
+  for(let i = 0; i < pos.count; i++) {
+    // O cilindro original tem raio 1 e altura de 0 a nipHeight
+    // Vamos ler as coordenadas originais não modificadas (baseadas no index e segmentos)
+    // Como modificamos in-place, precisamos calcular o Y original baseado no índice
+    // CylinderGeometry: vértices são gerados linha por linha, de cima para baixo.
+    const radialSegs = 64;
+    const heightSegs = 120;
+    const row = Math.floor(i / (radialSegs + 1));
+    const col = i % (radialSegs + 1);
+    
+    // Y vai de nipHeight (row=0) até 0 (row=heightSegs)
+    const y = state.nipHeight * (1 - (row / heightSegs));
+    const theta = (col / radialSegs) * Math.PI * 2;
+
+    // 1. Calcula o Raio R(y) baseado no perfil Stalk/Pocket
+    let r = state.dieRadius3D;
+    
+    if (y <= state.stalkHeight) {
+      // Pescoço
+      r = state.dieRadius3D + (y / (state.stalkHeight || 1)) * 0.05;
+    } 
+    else if (y <= state.flh) {
+      // Expansão (Sigmóide)
+      const t = (y - state.stalkHeight) / (state.flh - state.stalkHeight);
+      const smoothT = t * t * (3 - 2 * t);
+      const startR = state.dieRadius3D + 0.05;
+      r = startR + (state.maxRadius3D - startR) * smoothT;
+    } 
+    else {
+      // Zona Fria (Raio Máximo)
+      r = state.maxRadius3D;
+    }
+
+    // Salva para o gráfico (apenas uma vez por linha)
+    if(col === 0) {
+      graphData.heights.push(y);
+      graphData.radii.push(r);
+    }
+
+    // 2. Aplica o Achatamento (Flattening) no topo
+    let x = Math.cos(theta) * r;
+    let z = Math.sin(theta) * r;
+
+    if (y > flattenStart) {
+      let f = (y - flattenStart) / (state.nipHeight - flattenStart);
+      f = f * f * (3 - 2 * f); // Smoothstep
+      
+      // Achata no eixo Z (vai para 0)
+      z = z * (1 - f);
+      // Expande no eixo X para manter a circunferência (Largura plana = Pi * R / 2)
+      // Fator de expansão máximo é (PI/2) = 1.57
+      const targetX = Math.sign(Math.cos(theta)) * (r * Math.PI / 2) * Math.abs(Math.cos(theta));
+      x = x * (1 - f) + targetX * f;
+    }
+
+    pos.setXYZ(i, x, y, z);
+
+    // 3. Cores dos Vértices (Quente Laranja -> Frio Azul)
+    const color = new THREE.Color();
+    if (y < state.flh) {
+      // Quente
+      const heat = 1.0 - (y / state.flh);
+      color.setRGB(1.0, 0.4 + heat*0.4, 0.0);
+    } else {
+      // Frio
+      color.setRGB(0.4, 0.8, 1.0);
+    }
+    colors.push(color.r, color.g, color.b);
+  }
+
+  pos.needsUpdate = true;
+  balloonMesh.geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  balloonMesh.geometry.computeVertexNormals();
+
+  // Atualiza posição do anel de névoa
+  frostLineRing.position.set(0.8, 3.65 + state.flh, 0);
+  // O raio do anel é o raio do balão na altura FLH
+  const flRadius = graphData.radii[Math.floor((1 - state.flh/state.nipHeight) * 120)] || state.maxRadius3D;
+  frostLineRing.scale.setScalar(flRadius);
+}
+
+// ----------------------------------------------------------------------------
+// 7. GRÁFICO 2D (CANVAS)
+// ----------------------------------------------------------------------------
+function drawGraph() {
+  const canvas = document.getElementById('profile-chart');
+  const ctx = canvas.getContext('2d');
+  
+  // Ajusta resolução interna
+  canvas.width = canvas.clientWidth * window.devicePixelRatio;
+  canvas.height = canvas.clientHeight * window.devicePixelRatio;
+  const W = canvas.width;
+  const H = canvas.height;
+
+  ctx.clearRect(0, 0, W, H);
+
+  if(graphData.heights.length === 0) return;
+
+  // Margens
+  const padX = 40, padY = 20;
+  const drawW = W - padX * 2;
+  const drawH = H - padY * 2;
+
+  // Escalas
+  const maxY = state.nipHeight;
+  const maxR = 3.0; // Fixo para referência visual
+
+  // Desenha Eixos
+  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(padX + drawW/2, padY); // Eixo central Y
+  ctx.lineTo(padX + drawW/2, H - padY);
+  ctx.stroke();
+
+  // Desenha Perfil do Balão
+  ctx.strokeStyle = '#00b4ff';
+  ctx.fillStyle = 'rgba(0, 180, 255, 0.2)';
+  ctx.lineWidth = 3;
+  
+  ctx.beginPath();
+  // Lado Direito
+  for(let i=0; i<graphData.heights.length; i++) {
+    let y = H - padY - (graphData.heights[i] / maxY) * drawH;
+    let x = padX + drawW/2 + (graphData.radii[i] / maxR) * (drawW/2);
+    if(i===0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  // Lado Esquerdo (Inverso)
+  for(let i=graphData.heights.length-1; i>=0; i--) {
+    let y = H - padY - (graphData.heights[i] / maxY) * drawH;
+    let x = padX + drawW/2 - (graphData.radii[i] / maxR) * (drawW/2);
+    ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Desenha Linha de Névoa (FLH)
+  const flhY = H - padY - (state.flh / maxY) * drawH;
+  ctx.strokeStyle = '#00ffff';
+  ctx.setLineDash([5, 5]);
+  ctx.beginPath();
+  ctx.moveTo(padX, flhY);
+  ctx.lineTo(W - padX, flhY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Texto FLH
+  ctx.fillStyle = '#00ffff';
+  ctx.font = `${12 * window.devicePixelRatio}px monospace`;
+  ctx.fillText("FLH", padX, flhY - 5);
+}
+
+// ----------------------------------------------------------------------------
+// 8. CONTROLES DE CÂMERA CUSTOMIZADOS (SUAVES)
+// ----------------------------------------------------------------------------
+let isDragging = false;
+let prevMouse = { x: 0, y: 0 };
+// Câmera inicial focada no meio do balão
+let spherical = { theta: Math.PI/4, phi: Math.PI/2.2, r: 28 };
+let targetSpherical = { ...spherical };
+let targetLookAt = new THREE.Vector3(0.8, 12, 0);
+
+function setupCustomCamera(container) {
+  container.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    prevMouse = { x: e.clientX, y: e.clientY };
+  });
+
+  window.addEventListener('mouseup', () => isDragging = false);
+
+  window.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    const dx = e.clientX - prevMouse.x;
+    const dy = e.clientY - prevMouse.y;
+    
+    targetSpherical.theta -= dx * 0.005;
+    targetSpherical.phi -= dy * 0.005;
+    // Limites de inclinação (não deixa virar de cabeça para baixo)
+    targetSpherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, targetSpherical.phi));
+    
+    prevMouse = { x: e.clientX, y: e.clientY };
+  });
+
+  container.addEventListener('wheel', (e) => {
+    targetSpherical.r += e.deltaY * 0.05;
+    targetSpherical.r = Math.max(10, Math.min(60, targetSpherical.r));
+  });
+}
+
+function updateCamera() {
+  // Lerp suave
+  spherical.theta += (targetSpherical.theta - spherical.theta) * 0.1;
+  spherical.phi += (targetSpherical.phi - spherical.phi) * 0.1;
+  spherical.r += (targetSpherical.r - spherical.r) * 0.1;
+
+  camera.position.x = targetLookAt.x + spherical.r * Math.sin(spherical.phi) * Math.sin(spherical.theta);
+  camera.position.y = targetLookAt.y + spherical.r * Math.cos(spherical.phi);
+  camera.position.z = targetLookAt.z + spherical.r * Math.sin(spherical.phi) * Math.cos(spherical.theta);
+  
+  camera.lookAt(targetLookAt);
+}
+
+// ----------------------------------------------------------------------------
+// 9. LOOP DE ANIMAÇÃO PRINCIPAL
+// ----------------------------------------------------------------------------
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+
+  updateCamera();
+  updateParticles();
+
+  // Animação de Instabilidade (Wobble)
+  if (balloonMesh && state.wobbleAmp > 0) {
+    // Oscilação caótica baseada em senos
+    const wx = Math.sin(t * 4.0) * Math.cos(t * 2.1) * state.wobbleAmp;
+    const wz = Math.cos(t * 3.5) * Math.sin(t * 1.8) * state.wobbleAmp;
+    
+    // Aplica rotação na base do balão
+    balloonMesh.rotation.z = wx;
+    balloonMesh.rotation.x = wz;
+    frostLineRing.rotation.y = wx;
+    frostLineRing.rotation.x = Math.PI/2 + wz;
+  } else if (balloonMesh) {
+    // Retorna ao centro
+    balloonMesh.rotation.z *= 0.9;
+    balloonMesh.rotation.x *= 0.9;
+    frostLineRing.rotation.y *= 0.9;
+    frostLineRing.rotation.x = Math.PI/2;
+  }
+
+  // Rotação dos Rolos de Puxamento
+  if(nipRollsGroup) {
+    const rollSpeed = state.speed * 0.01;
+    nipRollsGroup.children[0].rotation.x += rollSpeed;
+    nipRollsGroup.children[1].rotation.x -= rollSpeed;
+  }
+
+  renderer.render(scene, camera);
+}
+
+// Responsividade
+window.addEventListener('resize', () => {
+  const container = document.getElementById('canvas-container');
+  camera.aspect = container.clientWidth / container.clientHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(container.clientWidth, container.clientHeight);
+  drawGraph(); // Redesenha o gráfico no novo tamanho
+});
+
+// Inicia a aplicação
+init3D();
+
+</script>
+</body>
+</html>
